@@ -4,6 +4,7 @@ TODO: file uploads, see all files on directory, better error treatment, friendly
 Simple reverse proxy file-sharing service written in C using sockets\
 Main source of knowledge: https://beej.us/guide/bgnet/html/split/\
 And some stack overflow threads + youtube videos
+Helped in listing files inside directory: https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
 
 ## Reverse Proxy
 A reverse proxy is an intermediary server that acts as a 'bridge' between the client and the proxy server[^1]. To the client this will seem like any old regular web server, but reverse proxy increases scalability, security and performance compared to a straight access from the user to the proxy server. This implementation is quite simple, only connecting the client to one backend server and allowing them to get files.
@@ -18,8 +19,7 @@ Simple schematic of how the system works:
 ## How to run
 First, compile the backend and revproxy files:
 
-`gcc -o revproxy revproxy.c`\
-`gcc -o backend backend.c`
+`make`\
 
 Then, run both at the same time\
 `./backend`\

@@ -10,14 +10,14 @@
 #include <limits.h>
 #include <linux/limits.h>
 #include <sys/sendfile.h>
-
+#include <dirent.h> // for directory operations (list files)
 
 #define PORT 8000
 #define ROOT_DIR "./www"
 #define BUFFER_SIZE 4096
 
 // Auxiliary function to resolve paths safely
-int is_path_safe(const char *root, const char *requested_path, char *resolved_path, size_t resolved_size) {
+int is_path_safe(const char *root, const char *requested_path, char *resolved_path) {
     char full_path[PATH_MAX];
     snprintf(full_path, sizeof(full_path), "%s%s", root, requested_path);
 
@@ -57,7 +57,7 @@ const char* get_mime_type(const char *path) {
     return "application/octet-stream"; // fallback
 }
 
-void send_response(int sockfd, const char *status, const char *content_type, const char *body) {
+void send_response(int s, const char *status, const char *content_type, const char *body) {
     // Construct the HTTP response
     char response[BUFFER_SIZE];
     int length = snprintf(response, BUFFER_SIZE,
@@ -67,14 +67,14 @@ void send_response(int sockfd, const char *status, const char *content_type, con
         "%s",
         status, content_type, strlen(body), body);
     
-    send(sockfd, response, length, 0);
+    send(s, response, length, 0);
 }
 
-void serve_file(int sockfd, const char *path) {
+void serve_file(int s, const char *path) {
     // Open the file in read-only mode
     int filefd = open(path, O_RDONLY);
     if (filefd == -1) {
-        send_response(sockfd, "404 Not Found", "text/plain", "File not found");
+        send_response(s, "404 Not Found", "text/plain", "File not found");
         return;
     }
 
@@ -92,22 +92,52 @@ void serve_file(int sockfd, const char *path) {
         "Content-Length: %ld\r\n\r\n",
         mime_type, stat_buf.st_size);
     
-    send(sockfd, headers, headers_len, 0);
+    send(s, headers, headers_len, 0);
     
     // Send the file content
     off_t offset = 0;
     while (offset < stat_buf.st_size) {
-        ssize_t sent = sendfile(sockfd, filefd, &offset, stat_buf.st_size - offset);
+        ssize_t sent = sendfile(s, filefd, &offset, stat_buf.st_size - offset);
         if (sent == -1) break;
     }
     
     close(filefd);
 }
 
-void handle_request(int sockfd) {
+// Auxiliary function to return a list of all files in ROOT_DIR
+void list_files(int s) {
+    // DIR data structure from dirent.h allows for directory operations
+    DIR *dir;
+    struct dirent *entry;
+    char filelist[BUFFER_SIZE] = "";
+
+    dir = opendir(ROOT_DIR);
+    if (!dir) {
+        send_response(s, "500 Internal Server Error", "text/plain", "Unable to open directory");
+        return;
+    }
+
+    strcat(filelist, "File List:\n");
+    while ((entry = readdir(dir)) != NULL) {
+        // Skip "." (current folder) and ".." (parent folder) 
+        // which are included in the DIR file list for some reason
+        if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+            // Maybe too big? Idk if there's a better way to do this if there's massive filenames
+            char line[512];
+            snprintf(line, sizeof(line), "%s\n", entry->d_name);
+            strcat(filelist, line);
+        }
+    }
+
+    strcat(filelist, "\n");
+    closedir(dir);
+    send_response(s, "200 OK", "text/plain", filelist);
+}
+
+void handle_request(int s) {
     char buffer[BUFFER_SIZE];
     // recv() will block until data is received
-    ssize_t bytes_read = recv(sockfd, buffer, BUFFER_SIZE - 1, 0);
+    ssize_t bytes_read = recv(s, buffer, BUFFER_SIZE - 1, 0);
     
     if (bytes_read < 0) {
         perror("recv failed");
@@ -122,7 +152,13 @@ void handle_request(int sockfd) {
     char *path = strtok(NULL, " ");
     
     if (!method || !path) {
-        send_response(sockfd, "400 Bad Request", "text/plain", "Invalid request");
+        send_response(s, "400 Bad Request", "text/plain", "Invalid request");
+        return;
+    }
+
+    // Request for list of available files
+    if (strcmp(path, "/list") == 0) {
+        list_files(s);
         return;
     }
     
@@ -132,13 +168,13 @@ void handle_request(int sockfd) {
 
     // Get file path with path checking
     char resolved_path[PATH_MAX];
-    if (!is_path_safe(ROOT_DIR, path, resolved_path, sizeof(resolved_path))) {
-        send_response(sockfd, "403 Forbidden", "text/plain", "Access denied");
+    if (!is_path_safe(ROOT_DIR, path, resolved_path)) {
+        send_response(s, "403 Forbidden", "text/plain", "Access denied");
         return;
     }
     
     // Send file
-    serve_file(sockfd, resolved_path);
+    serve_file(s, resolved_path);
 }
 
 int main() {
