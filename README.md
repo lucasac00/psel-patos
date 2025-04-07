@@ -36,3 +36,7 @@ Will return:\
 Example 2:\
 `curl http://localhost:4950/revproxy.drawio.png --output diagram.png`\
 Will download the diagram shown above
+
+Example 3:\
+`curl http://localhost:4950/list`\
+Will return a list of all available files
