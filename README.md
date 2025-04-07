@@ -3,7 +3,7 @@ TODO: file uploads, better error treatment, friendly UI, deploy
 
 Simple reverse proxy file-sharing service written in C using sockets\
 Main source of knowledge: https://beej.us/guide/bgnet/html/split/\
-And some stack overflow threads + youtube videos
+And some stack overflow threads + youtube videos\
 Helped in listing files inside directory: https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
 
 ## Reverse Proxy
