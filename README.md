@@ -1,5 +1,5 @@
 # REVERSE PROXY FILE-SHARING
-TODO: file uploads, see all files on directory, better error treatment, friendly UI, deploy
+TODO: file uploads, better error treatment, friendly UI, deploy
 
 Simple reverse proxy file-sharing service written in C using sockets\
 Main source of knowledge: https://beej.us/guide/bgnet/html/split/\
