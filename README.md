@@ -27,6 +27,8 @@ Then, run both at the same time\
 
 ## Available endpoints
 
+If you are trying to reach the endpoints from another machine (in the same network), make sure the 4950 port is open in your server's firewall and replace localhost with the server's IP.
+
 ### GET a file hosted in the server:
 Example:\
 `curl http://localhost:4950/test.txt`
@@ -46,3 +48,4 @@ Will return a list of all available files
 `curl -F "file=@test.txt" http://localhost:4950/upload`\
 Will send test.txt and save it in the server\
 Obs: Doesn't support all file formats yet, only tested throughly with text files
+
