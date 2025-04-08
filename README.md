@@ -7,7 +7,7 @@ And some stack overflow threads + youtube videos\
 Helped in listing files inside directory: https://stackoverflow.com/questions/4204666/how-to-list-files-in-a-directory-in-a-c-program
 
 ## Reverse Proxy
-A reverse proxy is an intermediary server that acts as a 'bridge' between the client and the proxy server[^1]. To the client this will seem like any old regular web server, but reverse proxy increases scalability, security and performance compared to a straight access from the user to the proxy server. This implementation is quite simple, only connecting the client to one backend server and allowing them to get files.
+A reverse proxy is an intermediary server that acts as a 'bridge' between the client and the proxy server. To the client this will seem like any old regular web server, but reverse proxy increases scalability, security and performance compared to a straight access from the user to the proxy server. This implementation is quite simple, only connecting the client to one backend server and allowing them to get files.
 
 ## Implementation
 This implementation only works on UNIX systems, seeing as it uses the <sys/socket.h> Berkley Sockets implementation. We use sockets to connect the three parts of the system (the client, the reverse proxy service, and the backend) together in a simple and readable way. We have two sockets, one that talks to the client and one that talks to the backend. The reverse proxy serves as a middleman that manages the communication between both sides, receiving data from one socket (client or backend) and redirecting it to the other
@@ -25,9 +25,9 @@ Then, run both at the same time\
 `./backend`\
 `./revproxy`
 
-Now, you can access any of the files in /www using HTTP requests
-(sending and listing available files in progress)
+## Available endpoints
 
+### GET a file hosted in the server:
 Example:\
 `curl http://localhost:4950/test.txt`
 Will return:\
@@ -37,6 +37,12 @@ Example 2:\
 `curl http://localhost:4950/revproxy.drawio.png --output diagram.png`\
 Will download the diagram shown above
 
-Example 3:\
+### GET a list of all files available in the server:
+Example:\
 `curl http://localhost:4950/list`\
 Will return a list of all available files
+
+### POST send a file to the server:
+`curl -F "file=@test.txt" http://localhost:4950/upload`\
+Will send test.txt and save it in the server\
+Obs: Doesn't support all file formats yet, only tested throughly with text files
