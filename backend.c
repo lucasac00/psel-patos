@@ -134,6 +134,117 @@ void list_files(int s) {
     send_response(s, "200 OK", "text/plain", filelist);
 }
 
+void handle_upload(int s, char *request) {
+    // RAW REQUEST:
+    // POST /upload HTTP/1.1
+    // Host:
+    // User-Agent:
+    // Accept:
+    // Content-Length:
+    // Content-Type: multipart/form-data; boundary=------------------------75f587bf0f612a9e
+
+    // --------------------------75f587bf0f612a9e
+    // Content-Disposition: form-data; name="file"; filename="test.txt"
+    // Content-Type: text/plain
+
+    // Test
+
+    // --------------------------75f587bf0f612a9e--
+
+    // First, let's extract the boundary:
+    // strstr() is used to find the first occurrence of a substring in a string
+    // and returns a pointer to it.
+    const char *boundary = strstr(request, "boundary=");
+    if (!boundary) {
+        send_response(s, "400 Bad Request", "text/plain", "No boundary found");
+        return;
+    }
+    boundary += strlen("boundary=");
+    const char *boundary_end = strstr(boundary, "\r\n\r\n");
+    char boundary_delim[100];
+    // Go to the end of the line and copy the boundary delimiter to boundary_delim
+    snprintf(boundary_delim, boundary_end - boundary + 1, "%s", boundary);
+
+    // Now, let's find the start of the body
+    const char *body = strstr(request, "\r\n\r\n");
+    if (!body) {
+        send_response(s, "400 Bad Request", "text/plain", "Invalid multipart body");
+        return;
+    }
+    body += 4; // skip past \r\n\r\n
+
+    // And skip past the delimiter
+    const char *part_start = strstr(body, boundary_delim);
+    if (!part_start) {
+        send_response(s, "400 Bad Request", "text/plain", "Boundary not found in body");
+        return;
+    }
+
+    part_start += strlen(boundary_delim) + 2; // skip \r\n
+    const char *headers_end = strstr(part_start, "\r\n\r\n");
+    if (!headers_end) {
+        send_response(s, "400 Bad Request", "text/plain", "Missing part headers");
+        return;
+    }
+
+    // Now we can extract the filename
+    // Look for filename in Content-Disposition
+    const char *filename_start = strstr(part_start, "filename=\"");
+    if (!filename_start) {
+        send_response(s, "400 Bad Request", "text/plain", "Filename missing in upload");
+        return;
+    }
+    filename_start += strlen("filename=\"");
+    const char *filename_end = strchr(filename_start, '"');
+    if (!filename_end) {
+        send_response(s, "400 Bad Request", "text/plain", "Malformed filename");
+        return;
+    }
+
+    // Saving the filename
+    char filename[256];
+    snprintf(filename, filename_end - filename_start + 1, "%s", filename_start);
+
+    // Finding the end of content-type
+    const char *content_type_start = strstr(part_start, "Content-Type: ");
+    if (!content_type_start) {
+        send_response(s, "400 Bad Request", "text/plain", "Content-Type missing in upload");
+        return;
+    }
+    const char *content_type_end = strstr(part_start, "\r\n\r\n");
+    if (!content_type_end) {
+        send_response(s, "400 Bad Request", "text/plain", "Couldn't fint Content-Type end");
+        return;
+    }
+
+    const char* file_content = content_type_end + 4;
+    //printf("File content starts at: %s\n", file_content);
+    // Finally, we're at the start of the actual file content.
+    // Find the end of the part (boundary again)
+    char boundary_search[128];
+    snprintf(boundary_search, sizeof(boundary_search), "--%s--", boundary_delim);
+    //printf("Boundary search: %s\n", boundary_search);
+    const char *part_end = strstr(file_content, boundary_search);
+    if (!part_end) {
+        send_response(s, "400 Bad Request", "text/plain", "Could not find end of part");
+        return;
+    }
+    //printf("File content ends at: %s\n", part_end);
+    // Save file
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s", ROOT_DIR, filename);
+    FILE *fp = fopen(path, "wb");
+    if (!fp) {
+        send_response(s, "500 Internal Server Error", "text/plain", "Could not write file");
+        return;
+    }
+
+    fwrite(file_content, 1, part_end - file_content, fp);
+    fclose(fp);
+
+    send_response(s, "200 OK", "text/plain", "File uploaded successfully");
+}
+
 void handle_request(int s) {
     char buffer[BUFFER_SIZE];
     // recv() will block until data is received
@@ -143,12 +254,16 @@ void handle_request(int s) {
         perror("recv failed");
         return;
     }
-    
     // Null-terminate the buffer to make it a valid string
     buffer[bytes_read] = '\0';
+    printf("Received request:\n%s\n", buffer);
     
-    // Req parsing
-    char *method = strtok(buffer, " ");
+    // Req parsing, HTTP method and path
+    char buffer_copy[BUFFER_SIZE];
+    strncpy(buffer_copy, buffer, sizeof(buffer_copy));
+    
+    // Parse method/path from the COPY
+    char *method = strtok(buffer_copy, " ");
     char *path = strtok(NULL, " ");
     
     if (!method || !path) {
@@ -159,6 +274,13 @@ void handle_request(int s) {
     // Request for list of available files
     if (strcmp(path, "/list") == 0) {
         list_files(s);
+        return;
+    }
+
+    // Request for uploading a file
+    if (strcmp(method, "POST") == 0 && strcmp(path, "/upload") == 0) {
+        printf("Upload request received\n");
+        handle_upload(s, buffer);
         return;
     }
     
