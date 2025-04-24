@@ -18,6 +18,7 @@
 // Full-duplex function to handle data transfer in both directions
 // This function uses select() to monitor both sockets for incoming data
 // and forwards the data accordingly.
+// https://en.wikipedia.org/wiki/Duplex_(telecommunications)
 void forward(int client_sock, int backend_sock) {
     char buffer[BUFFER_SIZE];
     // Initialize the file descriptor set
@@ -103,6 +104,7 @@ int main() {
     }
 
     // set the socket option to allow address reuse, getting rid of the “Address already in use.” message
+    // https://stackoverflow.com/questions/14388706/how-do-so-reuseaddr-and-so-reuseport-differ
     int opt = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
@@ -132,6 +134,7 @@ int main() {
     while (1) {
         struct sockaddr_in client_addr;
         // socklen_t is an unsigned int, used as one of the function parameters of accept()
+        // https://pubs.opengroup.org/onlinepubs/7908799/xns/syssocket.h.html
         socklen_t client_len = sizeof(client_addr);
         // accept() returns a new socket file descriptor for the incoming connection
         int client_s = accept(s, (struct sockaddr*)&client_addr, &client_len);
